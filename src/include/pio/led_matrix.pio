@@ -1,0 +1,67 @@
+.program led_matrix  ;
+
+.wrap_target
+    ; Lógica principal para serializar 1 bit do FIFO TX
+    out x, 1         ; Puxa 1 bit (mais significativo primeiro devido à config C) para o registrador X
+    jmp !x do_zero   ; Se o bit for 0, pula para do_zero
+do_one:              ; O bit é 1: T1H (~0.8us) + T1L (~0.45us)
+    set pins, 1 [4]  ; Pino ALTO por 5 ciclos (T1H) @ 8MHz PIO clock = 625ns (próximo de 0.8us)
+    jmp cont         ; Pula para a parte baixa comum
+do_zero:             ; O bit é 0: T0H (~0.4us) + T0L (~0.85us)
+    set pins, 1 [2]  ; Pino ALTO por 3 ciclos (T0H) @ 8MHz PIO clock = 375ns (próximo de 0.4us)
+    set pins, 0 [2]  ; Pino BAIXO por 3 ciclos @ 8MHz PIO clock = 375ns
+cont:                ; Parte baixa comum (T1L / parte de T0L)
+    set pins, 0 [1]  ; Pino BAIXO por 2 ciclos @ 8MHz PIO clock = 250ns (Total Low para T0 = 625ns, T1 = 250ns)
+                     ; Os tempos são aproximados, mas geralmente funcionam para WS2812.
+.wrap                ; Volta para o início (wrap_target) para o próximo bit
+
+
+% c-sdk {
+// Inclui para clock_get_hz
+#include "hardware/clocks.h"
+
+// Função de inicialização C para este programa PIO
+// Renomeada de 'main_program_init' para 'led_matrix_program_init'
+static inline void led_matrix_program_init(PIO pio, uint sm, uint offset, uint pin)
+{
+    // Obtém a configuração padrão gerada pelo pioasm
+    pio_sm_config c = led_matrix_program_get_default_config(offset); // Nome da função atualizado
+
+    // --- Configuração do Pino ---
+    // Associa o pino especificado às instruções 'set' neste SM
+    sm_config_set_set_pins(&c, pin, 1);
+    // Inicializa o GPIO para ser controlado pelo PIO especificado
+    pio_gpio_init(pio, pin);
+    // Define a direção do pino como saída no nível do PIO SM
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
+
+    // --- Configuração do Clock ---
+    // Define o clock do PIO SM. A lógica no .pio parece esperar ~8MHz.
+    // 1 ciclo = 125ns. (10 ciclos por bit de 1.25us @ 800kHz)
+    float div = (float)clock_get_hz(clk_sys) / 8000000.0f; // ~15.6 para 125MHz sysclk
+    sm_config_set_clkdiv(&c, div);
+
+    // --- Configuração do FIFO e Shift Register ---
+    // Junta os FIFOs TX e RX para ter mais espaço no TX (não usamos RX)
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+    // Configura o registrador de deslocamento de saída (OSR):
+    // - shift_right = false -> Desloca para a ESQUERDA (MSB enviado primeiro)
+    // - autopull = true -> Puxa automaticamente do FIFO TX quando OSR < threshold
+    // - pull_threshold = 24 -> Puxa novos 32 bits quando 24 bits tiverem sido deslocados
+    //                       (WS2812 usa 24 bits por LED: G-R-B)
+    sm_config_set_out_shift(&c, false, true, 24);
+
+    // --- Outras Configurações (do seu exemplo original) ---
+    // 'out_special': sticky=true -> Mantém o último valor de 'set' ou 'out' no pino
+    //                has_enable_pin=false, enable_pin_polarity=false
+    // sm_config_set_out_special(&c, true, false, false);
+    // Nota: 'set' override 'out' para o controle do pino aqui. A linha acima pode não ser estritamente necessária
+    //       porque 'set' é usado explicitamente para controlar o pino neste programa.
+
+    // --- Carrega e Inicia ---
+    // Carrega a configuração na máquina de estados
+    pio_sm_init(pio, sm, offset, &c);
+    // Habilita a máquina de estados
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}
