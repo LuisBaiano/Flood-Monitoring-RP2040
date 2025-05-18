@@ -4,7 +4,6 @@
 #include "buttons.h"
 #include "config.h"
 #include "debouncer.h"
-#include "pico/bootrom.h"
 
 static volatile bool flag_button_a = false; //Flag volátil indicando se o botão A foi pressionado
 //static volatile bool flag_button_b = false; //Flag volátil indicando se o botão B foi pressionado
@@ -51,7 +50,7 @@ static uint32_t last_press_time_b = 0;
  
      // Habilita interrupções por borda de descida para ambos os botões
      gpio_set_irq_enabled_with_callback(BUTTON_A_PIN, GPIO_IRQ_EDGE_FALL, true, &buttons_irq_callback);
-     gpio_set_irq_enabled_with_callback(BUTTON_B_PIN, GPIO_IRQ_EDGE_FALL, true, &buttons_irq_callback);
+    //gpio_set_irq_enabled_with_callback(BUTTON_B_PIN, GPIO_IRQ_EDGE_FALL, true, &buttons_irq_callback);
  }
  
  /**

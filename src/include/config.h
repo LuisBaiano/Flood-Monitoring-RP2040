@@ -25,25 +25,26 @@
 
 // --- Estruturas de Dados para Filas (Flood Alert Project) ---
 typedef struct {
-    uint16_t water_level_raw;     // 0-4095
-    uint16_t rain_volume_raw;     // 0-4095
-    uint8_t nivel_agua;  // 0-100
-    uint8_t volume_chuva;  // 0-100
+    uint16_t water_level_raw;     // Leitura crua do ADC para nível da água (0-4095)
+    uint16_t rain_volume_raw;     // Leitura crua do ADC para volume de chuva (0-4095)
+    uint8_t water_level_percent;  // Nível da água convertido para percentual (0-100)
+    uint8_t rain_volume_percent;  // Volume de chuva convertido para percentual (0-100)
 } SensorData_t;
 
 typedef enum {
-    ALERT_NONE,
-    ALERT_WATER_HIGH,
-    ALERT_RAIN_HIGH,
-    ALERT_BOTH_HIGH
+    ALERT_NONE,         // Sem alerta, tudo normal
+    ALERT_WATER_HIGH,   // Alerta: nível da água alto
+    ALERT_RAIN_HIGH,    // Alerta: volume de chuva alto
+    ALERT_BOTH_HIGH     // Alerta: ambos os níveis altos (situação crítica)
 } AlertLevel_t;
 
 typedef struct {
-    AlertLevel_t level;
-    uint8_t nivel_agua; // Para exibir no display em modo alerta
-    uint8_t volume_chuva; // Para exibir no display em modo alerta
-    bool is_alert_active;        // True se algum alerta está ativo
+    AlertLevel_t level;             // O tipo de alerta atual
+    uint8_t water_level_percent;  // Percentual do nível da água no momento do alerta
+    uint8_t rain_volume_percent;  // Percentual do volume de chuva no momento do alerta
+    bool is_alert_active;         // Flag indicando se qualquer alerta está ativo
 } AlertStatus_t;
+
 
 
 // --- Definições de Pinos (conforme seu arquivo) ---
@@ -83,9 +84,10 @@ typedef struct {
 // --- Constantes ---
 #define DEBOUNCE_TIME_US 50000 // Reduzido para melhor responsividade do botão A
 
-#define ADC_MAX_VALUE    4095
-#define ADC_CENTER       (ADC_MAX_VALUE / 2)
-#define ADC_DEADZONE     100 // Deadzone menor para o joystick
+#define ADC_MIN_VALUE      0
+#define ADC_MAX_VALUE      4095
+#define ADC_CENTER         ((ADC_MAX_VALUE + ADC_MIN_VALUE) / 2)
+#define ADC_DEADZONE       50    
 
 // Limiares para Alerta (Percentual)
 #define WATER_LEVEL_ALERT_THRESHOLD 70 // 70%

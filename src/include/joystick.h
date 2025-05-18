@@ -8,7 +8,6 @@
 void joystick_init(void);
 uint16_t joystick_read_x(void);
 uint16_t joystick_read_y(void);
-uint8_t joystick_adc_to_percent(uint16_t raw_value);
 bool joystick_button_pressed();
 
 
