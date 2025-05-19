@@ -12,7 +12,6 @@
 #include "hardware/i2c.h"
 #include "hardware/adc.h" 
 
-#include "buttons.h"     
 #include "joystick.h"     
 #include "buzzer.h"   
 

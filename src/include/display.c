@@ -44,13 +44,16 @@
     uint8_t start_y = 8;
      uint8_t line_height = 10; // Espaçamento vertical entre linhas
 
+    ssd1306_rect(ssd, 0, 0, 127, 63, 1, false);
      // Define as strings a serem exibidas
      const char *line1 = "EMBARCATECH";
      const char *line2 = "PROJETO";
-     const char *line3 = "MONITORAMENTO RTOS";
+     const char *line3 = "MONIT. ENCHENTE";
+     const char *line4 = "RTOS";
     ssd1306_draw_string(ssd, line1, center_x_approx - (strlen(line1)*8)/2, start_y);
     ssd1306_draw_string(ssd, line2, center_x_approx - (strlen(line2)*8)/2, start_y + line_height);
     ssd1306_draw_string(ssd, line3, center_x_approx - (strlen(line3)*8)/2, start_y + 2*line_height);
+    ssd1306_draw_string(ssd, line4, center_x_approx - (strlen(line4)*8)/2, start_y + 3*line_height);
     ssd1306_send_data(ssd);
     // Mantém a tela visível por um tempo
     sleep_ms(2500);

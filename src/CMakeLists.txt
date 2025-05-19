@@ -40,9 +40,7 @@ include_directories(
 # *** Update executable sources with new paths ***
 add_executable(main
         main.c
-        include/buttons.c
         include/buzzer.c
-        include/debouncer.c
         include/display.c
         include/led_matrix.c
         include/joystick.c

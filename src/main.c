@@ -18,7 +18,7 @@ void gpio_irq_handler(uint gpio, uint32_t events) {
 //-------------------
 
 // --- Global Variables & Queues ---
-ssd1306_t display_oled;
+ssd1306_t ssd;
 
 QueueHandle_t xSensorDataQueue;
 
@@ -40,10 +40,9 @@ void vDisplayInfoTask(void *pvParameters);
 void init_system_flood_alert() {
     stdio_init_all();
     sleep_ms(1000); // Tempo para o terminal serial conectar
-    printf("Initializing Flood Alert System...\n");
+    printf("Sistema de alerta de inundação!\n");
 
     joystick_init();
-    buttons_init(); // Inicializa apenas BUTTON_A_PIN (5) e BUTTON_B_PIN (6)
 
     // Para ser utilizado o modo BOOTSEL com botão B
     gpio_init(botaoB);
@@ -51,27 +50,25 @@ void init_system_flood_alert() {
     gpio_pull_up(botaoB);
     gpio_set_irq_enabled_with_callback(botaoB, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
 
-    buzzer_init();  // Usa BUZZER_PIN_MAIN (10)
+    buzzer_init(); 
     led_matrix_init();
 
     gpio_init(LED_RED_PIN); gpio_set_dir(LED_RED_PIN, GPIO_OUT); gpio_put(LED_RED_PIN, 0);
-    gpio_init(LED_GREEN_PIN); gpio_set_dir(LED_GREEN_PIN, GPIO_OUT); gpio_put(LED_GREEN_PIN, 1); // Normal = Verde
+    gpio_init(LED_GREEN_PIN); gpio_set_dir(LED_GREEN_PIN, GPIO_OUT); gpio_put(LED_GREEN_PIN, 1);
     gpio_init(LED_BLUE_PIN); gpio_set_dir(LED_BLUE_PIN, GPIO_OUT); gpio_put(LED_BLUE_PIN, 0);
 
-    display_init(&display_oled); // Função de display.c
+    display_init(&ssd);
 
-    printf("System Hardware Initialized.\n");
 }
 
 // --- Main Function ---
 int main() {
     init_system_flood_alert();
-    display_startup_screen(&display_oled); // Função de display.c
-    printf("Startup screen finished.\n");
+    display_startup_screen(&ssd);
 
     xSensorDataQueue = xQueueCreate(5, sizeof(SensorData_t));
 
-    // Crie as filas de alerta individuais
+    // Criação as filas de alerta individuais
     xDisplayAlertQueue   = xQueueCreate(3, sizeof(AlertStatus_t));
     xRgbLedAlertQueue    = xQueueCreate(3, sizeof(AlertStatus_t));
     xLedMatrixAlertQueue = xQueueCreate(3, sizeof(AlertStatus_t));
@@ -79,41 +76,42 @@ int main() {
 
     if (xSensorDataQueue == NULL || xDisplayAlertQueue == NULL ||
         xRgbLedAlertQueue == NULL || xLedMatrixAlertQueue == NULL || xBuzzerAlertQueue == NULL) {
-        printf("FATAL: Failed to create one or more queues!\n");
-        while(1); // Parar aqui
+        while(1);
     }
-    printf("Queues created.\n");
 
-    printf("Creating tasks...\n");
+    printf("Tarefas Criadas\n");
     xTaskCreate(vJoystickReadTask, "JoystickRead", STACK_SIZE_DEFAULT, NULL, PRIORITY_JOYSTICK_READ, NULL);
     xTaskCreate(vDataProcessingTask, "DataProcess", STACK_SIZE_DEFAULT, NULL, PRIORITY_DATA_PROCESSING, NULL);
     xTaskCreate(vRgbLedAlertTask, "RgbLedAlert", STACK_SIZE_DEFAULT, NULL, PRIORITY_RGB_LED_ALERT, NULL);
     xTaskCreate(vLedMatrixAlertTask, "MatrixAlert", STACK_SIZE_DEFAULT, NULL, PRIORITY_MATRIX_ALERT, NULL);
     xTaskCreate(vBuzzerAlertTask, "BuzzerAlert", STACK_SIZE_DEFAULT, NULL, PRIORITY_BUZZER_ALERT, NULL);
-    xTaskCreate(vDisplayInfoTask, "DisplayInfo", STACK_SIZE_DISPLAY, &display_oled, PRIORITY_DISPLAY_INFO, NULL);
+    xTaskCreate(vDisplayInfoTask, "DisplayInfo", STACK_SIZE_DISPLAY, &ssd, PRIORITY_DISPLAY_INFO, NULL);
 
-    printf("Starting FreeRTOS scheduler...\n");
     vTaskStartScheduler();
 
-    // Não deve chegar aqui
-    printf("Scheduler returned. Critical Error!\n");
     while(1);
-    return 0; // Para satisfazer o compilador
+    return 0;
 }
 
-// --- Task Implementations ---
+// --- Tarefas ---
 
+/**
+ * @brief Task responsável pelo processamento dos dados dos sensores (simulados com o joysitck).
+ * Esta tarefa aguarda indefinidamente por novos dados de sensores simulados
+ * (nível de água e volume de chuva) provenientes da fila `xSensorDataQueue`.
+ * Ao receber os dados, ela calcula o status de alerta (se algum limiar foi
+ * atingido) e determina o nível de alerta (nenhum, água alta, chuva alta ou ambos).
+ **/
 void vDataProcessingTask(void *pvParameters) {
+    printf("Task principal inicializada.\n");
     SensorData_t received_data;
     AlertStatus_t alert_status;
 
-    // Inicializa alert_status para um estado conhecido
     alert_status.is_alert_active = false;
     alert_status.level = ALERT_NONE;
     alert_status.water_level_percent = 0;
     alert_status.rain_volume_percent = 0;
 
-    printf("Task DataProcessing started.\n");
     while (true) {
         if (xQueueReceive(xSensorDataQueue, &received_data, portMAX_DELAY)) {
             alert_status.water_level_percent = received_data.water_level_percent;
@@ -137,29 +135,36 @@ void vDataProcessingTask(void *pvParameters) {
             }
 
             // DEBUG: Para verificar se o processamento e envio ocorrem
-            printf("DataProc: Sending WL:%u%% RV:%u%% AlertActive:%d Level:%d\n",
-                   alert_status.water_level_percent, alert_status.rain_volume_percent,
-                   alert_status.is_alert_active, alert_status.level);
+            //printf("DataProc: nivel de agua:%u%% voulme de chuva:%u%% AlertActive:%d Level:%d\n",
+            //    alert_status.water_level_percent, alert_status.rain_volume_percent,
+            //   alert_status.is_alert_active, alert_status.level);
 
             // Envia para todas as filas de alerta consumidoras
             // Usar timeout 0 ou pequeno para não bloquear a DataProcessingTask
             // se uma fila de consumidor estiver cheia.
+
             if (xQueueSend(xDisplayAlertQueue, &alert_status, 0) != pdPASS) {
-                 printf("DataProcessing: Failed to send to DisplayAlertQueue\n");
+                printf("DataProcessing: Failed to send to DisplayAlertQueue\n");
             }
             if (xQueueSend(xRgbLedAlertQueue, &alert_status, 0) != pdPASS) {
-                 printf("DataProcessing: Failed to send to RgbLedAlertQueue\n");
+                printf("DataProcessing: Failed to send to RgbLedAlertQueue\n");
             }
             if (xQueueSend(xLedMatrixAlertQueue, &alert_status, 0) != pdPASS) {
-                 printf("DataProcessing: Failed to send to LedMatrixAlertQueue\n");
+                printf("DataProcessing: Failed to send to LedMatrixAlertQueue\n");
             }
             if (xQueueSend(xBuzzerAlertQueue, &alert_status, 0) != pdPASS) {
-                 printf("DataProcessing: Failed to send to BuzzerAlertQueue\n");
+                printf("DataProcessing: Failed to send to BuzzerAlertQueue\n");
             }
         }
     }
 }
 
+/**
+ * @brief Task responsável pelo controle do LED RGB de alerta.
+ *
+ * Esta tarefa aguarda indefinidamente por um novo status de alerta (`AlertStatus_t`)
+ * da sua fila dedicada, `xRgbLedAlertQueue`.
+ **/
 void vRgbLedAlertTask(void *pvParameters) {
     AlertStatus_t current_alert;
     printf("Task RgbLedAlert started.\n");
@@ -178,25 +183,27 @@ void vRgbLedAlertTask(void *pvParameters) {
     }
 }
 
+/**
+ * @brief Task responsável por exibir informações de alerta na matriz de LEDs.
+ *
+ * Esta tarefa aguarda indefinidamente por um novo status de alerta (`AlertStatus_t`)
+ * da sua fila dedicada, `xLedMatrixAlertQueue`.
+ **/
 void vLedMatrixAlertTask(void *pvParameters) {
     AlertStatus_t current_alert_status;
-    // SensorData_t current_sensor_data; // Não é mais necessário aqui
-
-    // Inicialize current_alert_status se desejar um estado padrão antes do primeiro receive
     memset(&current_alert_status, 0, sizeof(AlertStatus_t));
     current_alert_status.is_alert_active = false;
     current_alert_status.level = ALERT_NONE;
 
     printf("Task LedMatrixAlert started.\n");
     while (true) {
-        // Não precisa mais do xQueuePeek(xSensorDataQueue, ...)
 
         if (xQueueReceive(xLedMatrixAlertQueue, &current_alert_status, portMAX_DELAY)) {
             if (current_alert_status.is_alert_active) {
                 led_matrix_display_alert(
                     current_alert_status.level,
-                    current_alert_status.water_level_percent, // Usa da struct de alerta recebida
-                    current_alert_status.rain_volume_percent  // Usa da struct de alerta recebida
+                    current_alert_status.water_level_percent,
+                    current_alert_status.rain_volume_percent 
                 );
             } else {
                 led_matrix_display_normal_status();
@@ -205,23 +212,28 @@ void vLedMatrixAlertTask(void *pvParameters) {
     }
 }
 
+/**
+ * @brief Task responsável pelo controle do buzzer de alerta sonoro.
+ *
+ * Esta tarefa gerencia a ativação e o padrão sonoro do buzzer com base no
+ * status de alerta recebido da sua fila dedicada, `xBuzzerAlertQueue`.
+ **/ 
 void vBuzzerAlertTask(void *pvParameters) {
+    printf("Tarefa do buzzer inicializada.\n");
     AlertStatus_t current_alert;
     bool buzzer_active = false; // Controla se o buzzer deve estar tocando intermitentemente
 
     // Inicialize current_alert se desejar um estado padrão antes do primeiro receive
     memset(&current_alert, 0, sizeof(AlertStatus_t));
 
-    printf("Task BuzzerAlert started.\n");
     while (true) {
         // Tenta receber um novo status de alerta.
         // Usar um timeout aqui permite que a lógica de "buzzer_active" funcione mesmo sem novos dados.
         if (xQueueReceive(xBuzzerAlertQueue, &current_alert, pdMS_TO_TICKS(10))) {
             buzzer_active = current_alert.is_alert_active && (current_alert.level != ALERT_NONE);
             if (!buzzer_active) {
-                 buzzer_play_tone(0, 0); // Desliga imediatamente se o alerta cessou
+                buzzer_play_tone(0, 0); // Desliga imediatamente se o alerta cessou
             }
-             printf("BuzzerTask: Received alert. Active: %d, Level: %d\n", current_alert.is_alert_active, current_alert.level);
         }
 
         // Lógica de tocar o buzzer baseada no estado mais recente de 'buzzer_active'
@@ -254,21 +266,19 @@ void vBuzzerAlertTask(void *pvParameters) {
     }
 }
 
-
+/**
+ * @brief Task responsável pela leitura periódica dos dados do joystick.
+ *
+ * Esta tarefa simula a leitura de sensores de nível de água e volume de chuva
+ * através dos eixos X e Y de um joystick analógico.
+ **/ 
 void vJoystickReadTask(void *pvParameters) {
     SensorData_t current_data;
-    printf("Task JoystickRead started.\n");
+    printf("Tarefa do joystick iniciada.\n");
 
     while (true) {
         current_data.water_level_raw = joystick_read_x();
         current_data.rain_volume_raw = joystick_read_y();
-
-        // TODO: CALIBRAR ADC_MIN_VALUE e ADC_MAX_VALUE CORRETAMENTE!
-        // Estes valores devem ser os limites REAIS do seu joystick para 0% e 100%
-        // Exemplo: Se repouso (0%) = 1655 e máximo = 4000
-        // ADC_MIN_VALUE_X = 1655; ADC_MAX_VALUE_X = 4000;
-        // Se repouso (0%) = 0 e máximo = 4095 (ADC 12 bits completo)
-        // ADC_MIN_VALUE = 0; ADC_MAX_VALUE = 4095;
 
         int32_t value_x = (int32_t)current_data.water_level_raw;
         int32_t value_y = (int32_t)current_data.rain_volume_raw;
@@ -302,12 +312,9 @@ void vJoystickReadTask(void *pvParameters) {
         if (current_data.rain_volume_percent > 100) current_data.rain_volume_percent = 100;
         if (percent_y < 0 && current_data.rain_volume_percent != 0) current_data.rain_volume_percent = 0;
 
-        // printf("Joystick: RawX=%d, PcntX=%d | RawY=%d, PcntY=%d\n",
-        //        current_data.water_level_raw, current_data.water_level_percent,
-        //        current_data.rain_volume_raw, current_data.rain_volume_percent);
 
         if (xQueueSend(xSensorDataQueue, &current_data, pdMS_TO_TICKS(10)) != pdPASS) {
-            printf("JoystickRead: Failed to send to SensorDataQueue\n");
+            printf("leitura falhando\n");
         }
 
         vTaskDelay(pdMS_TO_TICKS(JOYSTICK_READ_DELAY_MS));
@@ -316,6 +323,7 @@ void vJoystickReadTask(void *pvParameters) {
 
 
 void vDisplayInfoTask(void *pvParameters) {
+    printf("Tarefa do display inicializada.\n");
     ssd1306_t *ssd = (ssd1306_t *)pvParameters;
     AlertStatus_t current_alert_status;
 
@@ -323,42 +331,34 @@ void vDisplayInfoTask(void *pvParameters) {
     memset(&current_alert_status, 0, sizeof(AlertStatus_t));
     current_alert_status.level = ALERT_NONE;
     current_alert_status.is_alert_active = false;
-    current_alert_status.water_level_percent = 0; // Começa mostrando 0%
-    current_alert_status.rain_volume_percent = 0; // Começa mostrando 0%
+    current_alert_status.water_level_percent = 0;
+    current_alert_status.rain_volume_percent = 0; 
 
     char line1[30];
     char line2[30];
     char line3[30];
     char line4[30];
 
-    printf("Task DisplayInfo started.\n");
-    if (!ssd) {
-        printf("DisplayInfoTask: NULL display pointer!\n");
-        vTaskDelete(NULL); // Encerra a task se o display não for válido
-        return;
-    }
-
     while (true) {
         // Tenta receber o status de alerta da sua fila dedicada.
         if (xQueueReceive(xDisplayAlertQueue, &current_alert_status, pdMS_TO_TICKS(DISPLAY_UPDATE_DELAY_MS / 2))) {
-            printf("DisplayTask: AlertStatus RECEIVED! Agua: %u%%, Chuva: %u%%, Active: %d, Level: %d\n",
-                   current_alert_status.water_level_percent,
-                   current_alert_status.rain_volume_percent,
-                   current_alert_status.is_alert_active,
-                   current_alert_status.level);
+            printf("DisplayTask: AlertStatus recebido. Agua: %u%%, Chuva: %u%%, Active: %d, Level: %d\n",
+                current_alert_status.water_level_percent,
+                current_alert_status.rain_volume_percent,
+                current_alert_status.is_alert_active,
+                current_alert_status.level);
         } else {
-            // Timeout - nenhum novo dado de alerta recebido.
-            // O display continuará mostrando o último estado válido de current_alert_status.
-            printf("DisplayTask: DisplayAlertQueue Receive TIMEOUT.\n");
+            printf("DisplayTask: DisplayAlertQueue recebido. TIMEOUT.\n");
         }
 
-        ssd1306_fill(ssd, false); // Limpa o display
 
-        sprintf(line1, "Agua: %3u%%", current_alert_status.water_level_percent);
-        ssd1306_draw_string(ssd, line1, 2, 0);
+        ssd1306_fill(ssd, false); // Limpa o display.
+        ssd1306_rect(ssd, 0, 0, 127, 63, 1, false);
+        sprintf(line1, "NVL. AGUA: %3u%%", current_alert_status.water_level_percent);
+        ssd1306_draw_string(ssd, line1, 3, 5);
 
-        sprintf(line2, "Chuva: %3u%%", current_alert_status.rain_volume_percent);
-        ssd1306_draw_string(ssd, line2, 2, 15);
+        sprintf(line2, "VOL. CHUVA: %2u%%", current_alert_status.rain_volume_percent);
+        ssd1306_draw_string(ssd, line2, 3, 20);
 
         if (current_alert_status.is_alert_active) {
             strcpy(line3, "!!! ALERTA !!!");
@@ -369,12 +369,12 @@ void vDisplayInfoTask(void *pvParameters) {
                 default:               sprintf(line4, "Alerta Ativo");     break;
             }
         } else {
-            strcpy(line3, "Status: Normal");
+            strcpy(line3, "STATUS: NORMAL");
             strcpy(line4, ""); // Linha vazia
         }
 
-        ssd1306_draw_string(ssd, line3, 2, 30);
-        ssd1306_draw_string(ssd, line4, 2, 45);
+        ssd1306_draw_string(ssd, line3, 3, 35);
+        ssd1306_draw_string(ssd, line4, 3, 45);
 
         ssd1306_send_data(ssd);
         vTaskDelay(pdMS_TO_TICKS(DISPLAY_UPDATE_DELAY_MS));
