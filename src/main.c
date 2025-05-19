@@ -116,15 +116,6 @@ void vDataProcessingTask(void *pvParameters) {
                 alert_status.is_alert_active = false;
             }
 
-            // DEBUG: Para verificar se o processamento e envio ocorrem
-            //printf("DataProc: nivel de agua:%u%% voulme de chuva:%u%% AlertActive:%d Level:%d\n",
-            //    alert_status.water_level_percent, alert_status.rain_volume_percent,
-            //   alert_status.is_alert_active, alert_status.level);
-
-            // Envia para todas as filas de alerta consumidoras
-            // Usar timeout 0 ou pequeno para não bloquear a DataProcessingTask
-            // se uma fila de consumidor estiver cheia.
-
             if (xQueueSend(xDisplayAlertQueue, &alert_status, 0) != pdPASS) {
                 printf("DataProcessing: Failed to send to DisplayAlertQueue\n");
             }
