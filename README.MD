@@ -1,4 +1,3 @@
-```markdown
 # Estação de Alerta de Enchente com Simulação por Joystick usando FreeRTOS na BitDogLab
 
 ## Índice
@@ -216,4 +215,3 @@ Este design garante que as tarefas sejam desacopladas e que cada componente de f
 ## Demonstrativo em Vídeo
 
 *(O aluno deverá inserir aqui o link para o vídeo de demonstração do projeto, conforme solicitado nos requisitos da tarefa).*
-```
