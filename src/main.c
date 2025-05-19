@@ -9,14 +9,6 @@
 #include <stdio.h>           // Para printf
 #include <string.h>          // Para memset, strcpy, sprintf
 
-// Trecho para modo BOOTSEL com botão B
-#include "pico/bootrom.h"
-#define botaoB 6 // Defina o pino do botão B se não estiver em config.h
-void gpio_irq_handler(uint gpio, uint32_t events) {
-    reset_usb_boot(0, 0);
-}
-//-------------------
-
 // --- Global Variables & Queues ---
 ssd1306_t ssd;
 
@@ -41,23 +33,14 @@ void init_system_flood_alert() {
     stdio_init_all();
     sleep_ms(1000); // Tempo para o terminal serial conectar
     printf("Sistema de alerta de inundação!\n");
-
     joystick_init();
-
-    // Para ser utilizado o modo BOOTSEL com botão B
-    gpio_init(botaoB);
-    gpio_set_dir(botaoB, GPIO_IN);
-    gpio_pull_up(botaoB);
-    gpio_set_irq_enabled_with_callback(botaoB, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
-
     buzzer_init(); 
     led_matrix_init();
+    display_init(&ssd);
 
     gpio_init(LED_RED_PIN); gpio_set_dir(LED_RED_PIN, GPIO_OUT); gpio_put(LED_RED_PIN, 0);
     gpio_init(LED_GREEN_PIN); gpio_set_dir(LED_GREEN_PIN, GPIO_OUT); gpio_put(LED_GREEN_PIN, 1);
     gpio_init(LED_BLUE_PIN); gpio_set_dir(LED_BLUE_PIN, GPIO_OUT); gpio_put(LED_BLUE_PIN, 0);
-
-    display_init(&ssd);
 
 }
 
