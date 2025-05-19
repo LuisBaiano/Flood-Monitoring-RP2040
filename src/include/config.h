@@ -16,13 +16,10 @@
 #include "buzzer.h"   
 
 // FreeRTOS includes
-#include "FreeRTOS.h"
-#include "task.h"
-#include "queue.h" // For FreeRTOS Queues
-#include "FreeRTOSConfig.h" // User's FreeRTOS config
+#include "FreeRTOSConfig.h"
 
 
-// --- Estruturas de Dados para Filas (Flood Alert Project) ---
+// --- Estruturas de Dados para Filas ---
 typedef struct {
     uint16_t water_level_raw;     // Leitura crua do ADC para nível da água (0-4095)
     uint16_t rain_volume_raw;     // Leitura crua do ADC para volume de chuva (0-4095)

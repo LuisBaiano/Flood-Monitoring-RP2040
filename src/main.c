@@ -1,8 +1,7 @@
-// Includes como antes
-#include "config.h" // Certifique-se que este é o correto e inclui tudo
+#include "config.h"
 #include "display.h"         // Para display_init e display_flood_startup_screen
 #include "led_matrix.h"      // Para led_matrix_init, led_matrix_display_alert, led_matrix_display_normal_status
-#include "pico/stdlib.h"     // Para stdio_init_all, gpio_init, etc. (assumindo que joystick_init, etc. precisem)
+#include "pico/stdlib.h"     // Para stdio_init_all, gpio_init, etc.
 #include "FreeRTOS.h"        // Para FreeRTOS
 #include "task.h"            // Para xTaskCreate, vTaskStartScheduler, vTaskDelay
 #include "queue.h"           // Para QueueHandle_t, xQueueCreate, xQueueSend, xQueueReceive
@@ -28,7 +27,7 @@ void vLedMatrixAlertTask(void *pvParameters);
 void vBuzzerAlertTask(void *pvParameters);
 void vDisplayInfoTask(void *pvParameters);
 
-// --- System Initialization ---
+// --- Inicialização dos perifericos ---
 void init_system_flood_alert() {
     stdio_init_all();
     sleep_ms(1000); // Tempo para o terminal serial conectar
@@ -44,7 +43,7 @@ void init_system_flood_alert() {
 
 }
 
-// --- Main Function ---
+// --- Função Principal ---
 int main() {
     init_system_flood_alert();
     display_startup_screen(&ssd);
